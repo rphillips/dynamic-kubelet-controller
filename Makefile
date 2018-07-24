@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= quay.io/ryan_phillips/dynamic-kubelet-controller:latest
 
 all: test manager
 
