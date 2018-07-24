@@ -1,0 +1,9 @@
+apiVersion: dynamickubelet.openshift.io/v1alpha1
+kind: DynamicKubelet
+metadata:
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: dynamickubelet-sample
+spec:
+  # Add fields here
+  foo: bar
