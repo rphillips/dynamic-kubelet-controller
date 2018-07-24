@@ -9,3 +9,4 @@ spec:
       containers:
       - image: quay.io/ryan_phillips/dynamic-kubelet-controller:latest
         name: manager
+        args: [ "-kubeconfig", "/etc/kubernetes/kubeconfig" ]
