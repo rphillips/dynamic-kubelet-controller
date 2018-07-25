@@ -34,7 +34,6 @@ rules:
   verbs:
   - get
   - list
-  - watch
 - apiGroups:
   - dynamickubelet.openshift.io
   resources:

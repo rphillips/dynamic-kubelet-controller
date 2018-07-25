@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	dynamickubeletv1alpha1 "github.com/rphillips/dynamic-kubelet-controller/pkg/apis/dynamickubelet/v1alpha1"
@@ -43,16 +44,22 @@ var nodeRolesToConfigMap = map[string]string{
 const customNodeLabel = "node-role.kubernetes.io/custom"
 const defaultNamespace = "openshift-node"
 
-func getConfigMapName(node *corev1.Node) (string, error) {
+func getConfigMapName(node *corev1.Node) (types.NamespacedName, error) {
 	if configMap, ok := node.Labels[customNodeLabel]; ok {
-		return configMap, nil
+		namespace := defaultNamespace
+		name := configMap
+		if namespaceName := strings.Split(configMap, "/"); len(namespaceName) == 2 {
+			namespace = namespaceName[0]
+			name = namespaceName[1]
+		}
+		return types.NamespacedName{Namespace: namespace, Name: name}, nil
 	}
 	for nodeRole, configMap := range nodeRolesToConfigMap {
 		if _, ok := node.Labels[nodeRole]; ok {
-			return configMap, nil
+			return types.NamespacedName{Namespace: defaultNamespace, Name: configMap}, nil
 		}
 	}
-	return "", errorNodeNotManaged
+	return types.NamespacedName{}, errorNodeNotManaged
 }
 
 /**
@@ -109,7 +116,7 @@ type ReconcileDynamicKubelet struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:informers:group=core,version=v1,kind=Node
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list
 // +kubebuilder:rbac:groups=dynamickubelet.openshift.io,resources=dynamickubelets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileDynamicKubelet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Got event %v/%v", request.Namespace, request.Name)
@@ -123,12 +130,12 @@ func (r *ReconcileDynamicKubelet) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	if node.Spec.ConfigSource != nil && node.Spec.ConfigSource.ConfigMap.Name == configMapName {
-		log.Printf("Already Added ConfigMap %v/%v to Node %v", defaultNamespace, configMapName, node.Name)
+	if node.Spec.ConfigSource != nil && node.Spec.ConfigSource.ConfigMap.Name == configMapName.Name && node.Spec.ConfigSource.ConfigMap.Namespace == configMapName.Namespace {
+		log.Printf("Already Added ConfigMap %v/%v to Node %v", configMapName.Namespace, configMapName.Name, node.Name)
 		return reconcile.Result{}, err
 	}
 	configMap := &corev1.ConfigMap{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Namespace: defaultNamespace, Name: configMapName}, configMap); err != nil {
+	if err := r.Client.Get(ctx, configMapName, configMap); err != nil {
 		return reconcile.Result{}, err
 	}
 	err = r.addConfigMap(ctx, node, configMap)
