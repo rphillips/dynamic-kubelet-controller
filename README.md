@@ -15,8 +15,7 @@ Static Mappings:
 | Label                           | ConfigMap Name                     |
 | ------------------------------- | ---------------------------------- |
 | node-role.kubernetes.io/master  | openshift-node/node-config-master  |
-| node-role.kubernetes.io/infra   | openshift-node/node-config-infra   |
-| node-role.kubernetes.io/compute | openshift-node/node-config-compute |
+| node-role.kubernetes.io/worker  | openshift-node/node-config-worker |
 
 Custom ConfigMaps:
 
