@@ -24,6 +24,7 @@ import (
 
 	dynamickubeletv1alpha1 "github.com/rphillips/dynamic-kubelet-controller/pkg/apis/dynamickubelet/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,13 +37,17 @@ import (
 
 var errorNodeNotManaged = errors.New("Node not managed")
 var nodeRolesToConfigMap = map[string]string{
-	"node-role.kubernetes.io/master":  "node-config-master",
-	"node-role.kubernetes.io/infra":   "node-config-infra",
-	"node-role.kubernetes.io/compute": "node-config-compute",
+	"node-role.kubernetes.io/master": "node-config-master",
+	"node-role.kubernetes.io/worker": "node-config-worker",
+}
+var defaultConfigMapOptions = map[string]string{
+	"serializeImagePulls": "true",
 }
 
-const customNodeLabel = "node-role.kubernetes.io/custom"
-const defaultNamespace = "openshift-node"
+const (
+	customNodeLabel  = "node-role.kubernetes.io/custom"
+	defaultNamespace = "openshift-node"
+)
 
 func getConfigMapName(node *corev1.Node) (types.NamespacedName, error) {
 	if configMap, ok := node.Labels[customNodeLabel]; ok {
@@ -119,7 +124,7 @@ type ReconcileDynamicKubelet struct {
 // +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list
 // +kubebuilder:rbac:groups=dynamickubelet.openshift.io,resources=dynamickubelets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileDynamicKubelet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	log.Printf("Got event %v/%v", request.Namespace, request.Name)
+	log.Printf("Got event %v", request.Name)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	node := &corev1.Node{}
@@ -136,21 +141,38 @@ func (r *ReconcileDynamicKubelet) Reconcile(request reconcile.Request) (reconcil
 	}
 	configMap := &corev1.ConfigMap{}
 	if err := r.Client.Get(ctx, configMapName, configMap); err != nil {
-		return reconcile.Result{}, err
+		if apierrs.IsNotFound(err) {
+			err = r.createDefaultConfigMap(ctx, configMapName)
+			if err != nil {
+				return reconcile.Result{}, err
+			}
+		} else {
+			return reconcile.Result{}, err
+		}
 	}
-	err = r.addConfigMap(ctx, node, configMap)
+	err = r.addConfigMap(ctx, node, configMapName)
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	log.Printf("Added ConfigMap %v/%v to Node %v", configMap.Namespace, configMap.Name, node.Name)
+	log.Printf("... added ConfigMap %v/%v to Node %v", configMap.Namespace, configMap.Name, node.Name)
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileDynamicKubelet) addConfigMap(ctx context.Context, node *corev1.Node, cm *corev1.ConfigMap) error {
+func (r *ReconcileDynamicKubelet) createDefaultConfigMap(ctx context.Context, nsName types.NamespacedName) error {
+	log.Printf("Creating default ConfigMap %v/%v", nsName.Namespace, nsName.Name)
+	cm := &corev1.ConfigMap{}
+	cm.Name = nsName.Name
+	cm.Namespace = nsName.Namespace
+	cm.Data = defaultConfigMapOptions
+	return r.Client.Create(ctx, cm)
+}
+
+func (r *ReconcileDynamicKubelet) addConfigMap(ctx context.Context, node *corev1.Node, nsName types.NamespacedName) error {
+	log.Printf("Adding ConfigMap %v/%v to Node %v", nsName.Namespace, nsName.Name, node.Name)
 	node.Spec.ConfigSource = &corev1.NodeConfigSource{
 		ConfigMap: &corev1.ConfigMapNodeConfigSource{
-			Namespace:        cm.Namespace,
-			Name:             cm.Name,
+			Namespace:        nsName.Namespace,
+			Name:             nsName.Name,
 			KubeletConfigKey: "kubelet",
 		},
 	}
