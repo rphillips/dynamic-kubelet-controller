@@ -137,7 +137,7 @@ func (r *ReconcileDynamicKubelet) Reconcile(request reconcile.Request) (reconcil
 	}
 	if node.Spec.ConfigSource != nil && node.Spec.ConfigSource.ConfigMap.Name == configMapName.Name && node.Spec.ConfigSource.ConfigMap.Namespace == configMapName.Namespace {
 		log.Printf("Already Added ConfigMap %v/%v to Node %v", configMapName.Namespace, configMapName.Name, node.Name)
-		return reconcile.Result{}, err
+		return reconcile.Result{}, nil
 	}
 	configMap := &corev1.ConfigMap{}
 	if err := r.Client.Get(ctx, configMapName, configMap); err != nil {
@@ -154,7 +154,7 @@ func (r *ReconcileDynamicKubelet) Reconcile(request reconcile.Request) (reconcil
 	if err != nil {
 		return reconcile.Result{}, err
 	}
-	log.Printf("... added ConfigMap %v/%v to Node %v", configMap.Namespace, configMap.Name, node.Name)
+	log.Printf("... added ConfigMap %v/%v to Node %v", configMapName.Namespace, configMapName.Name, node.Name)
 	return reconcile.Result{}, nil
 }
 
