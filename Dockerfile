@@ -1,5 +1,5 @@
 # Build the manager binary
-FROM golang:1.10.3 as builder
+FROM docker.io/openshift/origin-release:golang-1.10 as builder
 
 # Copy in the go src
 WORKDIR /go/src/github.com/rphillips/dynamic-kubelet-controller
