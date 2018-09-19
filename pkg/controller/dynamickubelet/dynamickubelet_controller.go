@@ -121,7 +121,7 @@ type ReconcileDynamicKubelet struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:informers:group=core,version=v1,kind=Node
 // +kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch;create
 // +kubebuilder:rbac:groups=dynamickubelet.openshift.io,resources=dynamickubelets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileDynamicKubelet) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	log.Printf("Got event %v", request.Name)
